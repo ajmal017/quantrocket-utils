@@ -10,12 +10,13 @@ from termcolor import colored
 from colorama import init as colorama_init
 
 ### QuantRocket ###
-import trading_calendars as tc
+import trading_calendars as tc1
+import ib_trading_calendars as tc2
 
 
 LISTINGS_FILE = None
 CONID_SYMBOL_MAP = defaultdict(dict)
-SYMBOL_CONID_MAP = defaultdict(dict)
+SYMBOL_CONID_MAP = defaultdict(list)
 CONID_TIMEZONE_MAP = defaultdict(dict)
 
 
@@ -48,10 +49,10 @@ def initialize(listings_file):
         reader = csv.reader(f)
         next(reader)
         for line in reader:
-            conid, symbol, primary_exchange, timezone = int(line[0]), line[1], line[4], line[10]
-            # CONID_SYMBOL_MAP[conid] = (primary_exchange, symbol)
-            CONID_SYMBOL_MAP[str(conid)] = (primary_exchange, symbol)
-            SYMBOL_CONID_MAP[symbol][primary_exchange] = conid
+            conid, symbol, sec_type, primary_exchange, timezone, valid_exchanges = (int(line[0]), line[1], line[3],
+                                                                                    line[4], line[10], line[11].split(","))
+            CONID_SYMBOL_MAP[str(conid)] = (symbol, primary_exchange, valid_exchanges)
+            SYMBOL_CONID_MAP[symbol].append((conid, primary_exchange, valid_exchanges))
             CONID_TIMEZONE_MAP[conid] = timezone
 
 
@@ -65,31 +66,50 @@ class Asset():
         if conid_or_symbol in CONID_SYMBOL_MAP:
             # Input is a ConId
             self.conid = int(conid_or_symbol)
-            self.exchange, self.symbol = CONID_SYMBOL_MAP[conid_or_symbol]
+            self.symbol, self.primary_exchange, self.valid_exchanges = CONID_SYMBOL_MAP[conid_or_symbol]
         elif conid_or_symbol in SYMBOL_CONID_MAP:
             # Input is a Symbol
-            if exchange and exchange not in SYMBOL_CONID_MAP[conid_or_symbol]:
-                raise Exception("{} is not a valid exchange for symbol {}."
-                                "\nValid exchanges are: {}".format(exchange, conid_or_symbol, ", ".join(list(SYMBOL_CONID_MAP[conid_or_symbol].keys()))))
-            if len(SYMBOL_CONID_MAP[conid_or_symbol]) > 1:
-                if exchange:
-                    self.conid = SYMBOL_CONID_MAP[conid_or_symbol][exchange]
+            if not exchange:
+                if len(SYMBOL_CONID_MAP[conid_or_symbol]) == 1:
+                    conid, primary_exchange, valid_exchanges = SYMBOL_CONID_MAP[conid_or_symbol][0]
+                    self.conid = conid
                     self.symbol = conid_or_symbol
-                    self.exchange = exchange
+                    self.primary_exchange = primary_exchange
+                    self.valid_exchanges = valid_exchanges
                 else:
+                    all_exchanges = []
+                    for item in SYMBOL_CONID_MAP[conid_or_symbol]:
+                        all_exchanges.extend(item[2])
                     raise Exception("Multiple symbols found. Please specify an exchange."
-                                    "\nValid exchanges are: {}".format(", ".join(list(SYMBOL_CONID_MAP[conid_or_symbol].keys()))))
+                                    "\nValid exchanges are: {}".format(", ".join(sorted(set(all_exchanges)))))
             else:
-                self.exchange, self.conid = list(SYMBOL_CONID_MAP[conid_or_symbol].items())[0]
-                self.symbol = conid_or_symbol
+                for conid, primary_exchange, valid_exchanges in SYMBOL_CONID_MAP[conid_or_symbol]:
+                    if exchange == primary_exchange or exchange in valid_exchanges:
+                        self.conid = conid
+                        self.symbol = conid_or_symbol
+                        self.primary_exchange = primary_exchange
+                        self.valid_exchanges = valid_exchanges
+                        break
+                else:
+                    all_exchanges = []
+                    for item in SYMBOL_CONID_MAP[conid_or_symbol]:
+                        all_exchanges.extend(item[2])
+                    raise Exception("{} is not a valid exchange."
+                                    "\nValid exchanges are: {}".format(exchange, ", ".join(sorted(set(all_exchanges)))))
         else:
             raise Exception("{} is neither a valid symbol nor a valid ConId".format(conid_or_symbol))
 
         self.timezone = CONID_TIMEZONE_MAP[self.conid]
+        self.selected_exchange = exchange or self.primary_exchange
 
-        available_calendars = set(tc.calendar_utils._default_calendar_aliases.keys()) | \
-            set(tc.calendar_utils._default_calendar_aliases.values())
-        self.calendar = tc.get_calendar(self.exchange) if self.exchange in available_calendars else None
+        available_calendars_1 = set(tc1.calendar_utils._default_calendar_aliases.keys()) | \
+            set(tc1.calendar_utils._default_calendar_aliases.values())
+        available_calendars_2 = set(tc2.ib_calendar_names)
+        self.calendar = None
+        if self.selected_exchange in available_calendars_2:
+            self.calendar = tc1.get_calendar(self.selected_exchange)
+        elif self.selected_exchange in available_calendars_1:
+            self.calendar = tc2.get_calendar(self.selected_exchange)
 
     def can_trade(self, date, time=None):
         """Given a date and optional time, returns whether the asset can be traded at that time.
@@ -122,7 +142,7 @@ class Asset():
         return self.conid == other.conid
 
     def __lt__(self, other):
-        return (self.conid < other.conid)
+        return self.conid < other.conid
 
     def __hash__(self):
         return hash(str(self))
@@ -131,6 +151,6 @@ class Asset():
         calendar_name = self.calendar.name if self.calendar else None
         return "Asset(ConId={}, Symbol={}, Exchange={}, Timezone={}, calendar={})".format(self.conid,
                                                                                           self.symbol,
-                                                                                          self.exchange,
+                                                                                          self.selected_exchange,
                                                                                           self.timezone,
                                                                                           calendar_name)
