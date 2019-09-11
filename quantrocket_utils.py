@@ -1,5 +1,7 @@
 ### System ###
+import os
 import csv
+import pickle
 from time import time
 from collections import defaultdict
 from functools import total_ordering
@@ -40,10 +42,17 @@ def timeit(title=None):
 
 
 def initialize(listings_file):
-    global LISTINGS_FILE, CONID_SYMBOL_MAP, SYMBOL_CONID_MAP, CONID_TIMEZONE_MAP
+    global LISTINGS_FILE, CACHE_FILE, CONID_SYMBOL_MAP, SYMBOL_CONID_MAP, CONID_TIMEZONE_MAP
     colorama_init()
 
     LISTINGS_FILE = listings_file
+    CACHE_FILE = "{}.bin".format(os.path.splitext(listings_file)[0])
+
+    if os.path.exists(CACHE_FILE):
+        with open(CACHE_FILE, "rb") as f:
+            data = pickle.load(f)
+            CONID_SYMBOL_MAP, SYMBOL_CONID_MAP, CONID_TIMEZONE_MAP = data
+        return
 
     with open(LISTINGS_FILE, "r") as f:
         reader = csv.reader(f)
@@ -54,6 +63,11 @@ def initialize(listings_file):
             CONID_SYMBOL_MAP[str(conid)] = (symbol, primary_exchange, valid_exchanges)
             SYMBOL_CONID_MAP[symbol].append((conid, primary_exchange, valid_exchanges))
             CONID_TIMEZONE_MAP[conid] = timezone
+
+    if not os.path.exists(CACHE_FILE):
+        data = (CONID_SYMBOL_MAP, SYMBOL_CONID_MAP, CONID_TIMEZONE_MAP)
+        with open(CACHE_FILE, "wb") as f:
+            pickle.dump(data, f)
 
 
 @total_ordering
@@ -154,3 +168,7 @@ class Asset():
                                                                                           self.selected_exchange,
                                                                                           self.timezone,
                                                                                           calendar_name)
+
+if __name__ == '__main__':
+    with timeit("Loading Listings"):
+        initialize("../data/listings.csv")
