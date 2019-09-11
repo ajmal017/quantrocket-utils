@@ -86,7 +86,7 @@ class Asset():
             if not exchange:
                 if len(SYMBOL_CONID_MAP[conid_or_symbol]) == 1:
                     conid, primary_exchange, valid_exchanges = SYMBOL_CONID_MAP[conid_or_symbol][0]
-                    self.conid = conid
+                    self.conid = int(conid)
                     self.symbol = conid_or_symbol
                     self.primary_exchange = primary_exchange
                     self.valid_exchanges = valid_exchanges
@@ -99,7 +99,7 @@ class Asset():
             else:
                 for conid, primary_exchange, valid_exchanges in SYMBOL_CONID_MAP[conid_or_symbol]:
                     if exchange == primary_exchange or exchange in valid_exchanges:
-                        self.conid = conid
+                        self.conid = int(conid)
                         self.symbol = conid_or_symbol
                         self.primary_exchange = primary_exchange
                         self.valid_exchanges = valid_exchanges
@@ -159,7 +159,7 @@ class Asset():
         return self.conid < other.conid
 
     def __hash__(self):
-        return hash(str(self))
+        return hash(self.conid)
 
     def __repr__(self):
         calendar_name = self.calendar.name if self.calendar else None
