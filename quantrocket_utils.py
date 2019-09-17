@@ -64,10 +64,9 @@ def initialize(listings_file):
             SYMBOL_CONID_MAP[symbol].append((conid, primary_exchange, valid_exchanges))
             CONID_TIMEZONE_MAP[conid] = timezone
 
-    if not os.path.exists(CACHE_FILE):
-        data = (CONID_SYMBOL_MAP, SYMBOL_CONID_MAP, CONID_TIMEZONE_MAP)
-        with open(CACHE_FILE, "wb") as f:
-            pickle.dump(data, f)
+    data = (CONID_SYMBOL_MAP, SYMBOL_CONID_MAP, CONID_TIMEZONE_MAP)
+    with open(CACHE_FILE, "wb") as f:
+        pickle.dump(data, f)
 
 
 @total_ordering
