@@ -38,6 +38,13 @@ def timeit(title=None):
     else:
         print("{}  finished in {:0.2f} min".format(colored("\u2713", "green"), elapsed / 60))
 
+def is_quantrocket():
+    try:
+        from quantrocket.houston import Houston
+        return Houston().get("/").status_code == 200
+    except:
+        return False
+
 ###
 
 
@@ -171,3 +178,4 @@ class Asset():
 if __name__ == '__main__':
     with timeit("Loading Listings"):
         initialize("../data/listings.csv")
+    print(is_quantrocket())
