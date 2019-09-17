@@ -66,7 +66,7 @@ def initialize(listings_file):
 
     data = (CONID_SYMBOL_MAP, SYMBOL_CONID_MAP, CONID_TIMEZONE_MAP)
     with open(CACHE_FILE, "wb") as f:
-        pickle.dump(data, f)
+        pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 @total_ordering
