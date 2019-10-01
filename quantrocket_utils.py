@@ -38,6 +38,7 @@ def timeit(title=None):
     else:
         print("{}  finished in {:0.2f} min".format(colored("\u2713", "green"), elapsed / 60))
 
+
 def is_quantrocket():
     try:
         from quantrocket.houston import Houston
