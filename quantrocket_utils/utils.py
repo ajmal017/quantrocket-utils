@@ -80,9 +80,9 @@ def initialize(listings_file):
         pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-class IterRegistry(type):
+class LazyInit(type):
 
-    def __call__(cls, *args, **kwargs):
+    def __call__(self, *args, **kwargs):
         def init_before_get(obj, attr):
             if not object.__getattribute__(obj, "_initialized") and not object.__getattribute__(obj, "_during_init"):
                 obj._during_init = True
@@ -91,25 +91,19 @@ class IterRegistry(type):
                 obj._initialized = True
             return object.__getattribute__(obj, attr)
 
-        new_obj = cls.__new__(cls, *args, **kwargs)
+        new_obj = type.__call__(self, *args, **kwargs)
         new_obj._initialized = False
         new_obj._during_init = False
-        new_obj.__init__(*args, **kwargs)
 
-        cls.__getattribute__ = init_before_get
+        self.__getattribute__ = init_before_get
 
         return new_obj
 
-    def __iter__(cls):
-        return iter(cls._registry)
-
 
 @total_ordering
-class Asset(metaclass=IterRegistry):
-    _registry = []
+class Asset(metaclass=LazyInit):
 
     def __init__(self, conid_or_symbol, exchange):
-        self._registry.append(self)
         self._init_conid_or_symbol = conid_or_symbol
         self._init_exchange = exchange
 
