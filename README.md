@@ -1,6 +1,41 @@
 # QuantRocket Utility Library
 Utility methods for common tasks in QuantRocket.
 
+## Installation
+`quantrocket-utils` can be installed via `pip`:
+```bash
+$ pip install quantrocket-utils
+```
+
+## Development
+
+This project uses [poetry](https://poetry.eustace.io/) for development and release management.
+```
+$ git clone git@github.com:boosting-alpha-bv/quantrocket-utils.git
+$ cd quantrocket-utils/
+$ poetry install
+```
+
+### Running Tests
+```bash
+$ poetry run coverage run --branch --source quantrocket_utils -m pytest
+```
+
+### Generating Coverage Reports
+```bash
+$ poetry run coverage html
+```
+
+### Running flake8
+```bash
+$ poetry run flake8 quantrocket_utils tests
+```
+
+### Deploying
+```bash
+$ poetry publish --build --username "${PYPI_USERNAME}" --password "${PYPI_PASSWORD}" --no-interaction
+```
+
 ## Usage
 This library requires an external file that contains the listing information for the stocks it should translate.
 This is typically exported from QuantRocket and then supplied at initialization time of the library.

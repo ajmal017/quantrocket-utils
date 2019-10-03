@@ -7,6 +7,9 @@ from collections import defaultdict
 from functools import total_ordering
 from contextlib import contextmanager
 
+### Date Handling ###
+import arrow
+
 ### Display ###
 from termcolor import colored
 from colorama import init as colorama_init
@@ -77,51 +80,81 @@ def initialize(listings_file):
         pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-@total_ordering
-class Asset():
+class IterRegistry(type):
 
-    def __init__(self, conid_or_symbol, exchange=None):
-        conid_or_symbol = str(conid_or_symbol)
+    def __call__(cls, *args, **kwargs):
+        def init_before_get(obj, attr):
+            if not object.__getattribute__(obj, "_initialized") and not object.__getattribute__(obj, "_during_init"):
+                obj._during_init = True
+                obj.initialize()
+                obj._during_init = False
+                obj._initialized = True
+            return object.__getattribute__(obj, attr)
+
+        new_obj = cls.__new__(cls, *args, **kwargs)
+        new_obj._initialized = False
+        new_obj._during_init = False
+        new_obj.__init__(*args, **kwargs)
+
+        cls.__getattribute__ = init_before_get
+
+        return new_obj
+
+    def __iter__(cls):
+        return iter(cls._registry)
+
+
+@total_ordering
+class Asset(metaclass=IterRegistry):
+    _registry = []
+
+    def __init__(self, conid_or_symbol, exchange):
+        self._registry.append(self)
+        self._init_conid_or_symbol = conid_or_symbol
+        self._init_exchange = exchange
+
+    def initialize(self):
+        self._init_conid_or_symbol = str(self._init_conid_or_symbol)
         if not LISTINGS_FILE:
             raise Exception("Listings file is not set. Did you forget to call initialize()?")
-        if conid_or_symbol in CONID_SYMBOL_MAP:
+        if self._init_conid_or_symbol in CONID_SYMBOL_MAP:
             # Input is a ConId
-            self.conid = int(conid_or_symbol)
-            self.symbol, self.primary_exchange, self.valid_exchanges = CONID_SYMBOL_MAP[conid_or_symbol]
-        elif conid_or_symbol in SYMBOL_CONID_MAP:
+            self.conid = int(self._init_conid_or_symbol)
+            self.symbol, self.primary_exchange, self.valid_exchanges = CONID_SYMBOL_MAP[self._init_conid_or_symbol]
+        elif self._init_conid_or_symbol in SYMBOL_CONID_MAP:
             # Input is a Symbol
-            if not exchange:
-                if len(SYMBOL_CONID_MAP[conid_or_symbol]) == 1:
-                    conid, primary_exchange, valid_exchanges = SYMBOL_CONID_MAP[conid_or_symbol][0]
+            if not self._init_exchange:
+                if len(SYMBOL_CONID_MAP[self._init_conid_or_symbol]) == 1:
+                    conid, primary_exchange, valid_exchanges = SYMBOL_CONID_MAP[self._init_conid_or_symbol][0]
                     self.conid = int(conid)
-                    self.symbol = conid_or_symbol
+                    self.symbol = self._init_conid_or_symbol
                     self.primary_exchange = primary_exchange
                     self.valid_exchanges = valid_exchanges
                 else:
                     all_exchanges = []
-                    for item in SYMBOL_CONID_MAP[conid_or_symbol]:
+                    for item in SYMBOL_CONID_MAP[self._init_conid_or_symbol]:
                         all_exchanges.extend(item[2])
                     raise Exception("Multiple symbols found. Please specify an exchange."
                                     "\nValid exchanges are: {}".format(", ".join(sorted(set(all_exchanges)))))
             else:
-                for conid, primary_exchange, valid_exchanges in SYMBOL_CONID_MAP[conid_or_symbol]:
-                    if exchange == primary_exchange or exchange in valid_exchanges:
+                for conid, primary_exchange, valid_exchanges in SYMBOL_CONID_MAP[self._init_conid_or_symbol]:
+                    if self._init_exchange == primary_exchange or self._init_exchange in valid_exchanges:
                         self.conid = int(conid)
-                        self.symbol = conid_or_symbol
+                        self.symbol = self._init_conid_or_symbol
                         self.primary_exchange = primary_exchange
                         self.valid_exchanges = valid_exchanges
                         break
                 else:
                     all_exchanges = []
-                    for item in SYMBOL_CONID_MAP[conid_or_symbol]:
+                    for item in SYMBOL_CONID_MAP[self._init_conid_or_symbol]:
                         all_exchanges.extend(item[2])
                     raise Exception("{} is not a valid exchange."
-                                    "\nValid exchanges are: {}".format(exchange, ", ".join(sorted(set(all_exchanges)))))
+                                    "\nValid exchanges are: {}".format(self._init_exchange, ", ".join(sorted(set(all_exchanges)))))
         else:
-            raise Exception("{} is neither a valid symbol nor a valid ConId".format(conid_or_symbol))
+            raise Exception("{} is neither a valid symbol nor a valid ConId".format(self._init_conid_or_symbol))
 
         self.timezone = CONID_TIMEZONE_MAP[self.conid]
-        self.selected_exchange = exchange or self.primary_exchange
+        self.selected_exchange = self._init_exchange or self.primary_exchange
 
         available_calendars_1 = set(tc1.calendar_utils._default_calendar_aliases.keys()) | \
             set(tc1.calendar_utils._default_calendar_aliases.values())
@@ -175,8 +208,3 @@ class Asset():
                                                                                           self.selected_exchange,
                                                                                           self.timezone,
                                                                                           calendar_name)
-
-if __name__ == '__main__':
-    with timeit("Loading Listings"):
-        initialize("../data/listings.csv")
-    print(is_quantrocket())
