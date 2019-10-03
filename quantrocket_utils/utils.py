@@ -63,49 +63,43 @@ def initialize(listings_file):
         with open(CACHE_FILE, "rb") as f:
             data = pickle.load(f)
             CONID_SYMBOL_MAP, SYMBOL_CONID_MAP, CONID_TIMEZONE_MAP = data
-        return
+    else:
+        with open(LISTINGS_FILE, "r") as f:
+            reader = csv.reader(f)
+            next(reader)
+            for line in reader:
+                conid, symbol, sec_type, primary_exchange, timezone, valid_exchanges = (int(line[0]), line[1], line[3],
+                                                                                        line[4], line[10], line[11].split(","))
+                CONID_SYMBOL_MAP[str(conid)] = (symbol, primary_exchange, valid_exchanges)
+                SYMBOL_CONID_MAP[symbol].append((conid, primary_exchange, valid_exchanges))
+                CONID_TIMEZONE_MAP[conid] = timezone
 
-    with open(LISTINGS_FILE, "r") as f:
-        reader = csv.reader(f)
-        next(reader)
-        for line in reader:
-            conid, symbol, sec_type, primary_exchange, timezone, valid_exchanges = (int(line[0]), line[1], line[3],
-                                                                                    line[4], line[10], line[11].split(","))
-            CONID_SYMBOL_MAP[str(conid)] = (symbol, primary_exchange, valid_exchanges)
-            SYMBOL_CONID_MAP[symbol].append((conid, primary_exchange, valid_exchanges))
-            CONID_TIMEZONE_MAP[conid] = timezone
+        data = (CONID_SYMBOL_MAP, SYMBOL_CONID_MAP, CONID_TIMEZONE_MAP)
+        with open(CACHE_FILE, "wb") as f:
+            pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
 
-    data = (CONID_SYMBOL_MAP, SYMBOL_CONID_MAP, CONID_TIMEZONE_MAP)
-    with open(CACHE_FILE, "wb") as f:
-        pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
+    for asset in Asset:
+        if not asset._initialized:
+            asset.initialize()
 
 
-class LazyInit(type):
+class IterRegistry(type):
 
-    def __call__(self, *args, **kwargs):
-        def init_before_get(obj, attr):
-            if not object.__getattribute__(obj, "_initialized") and not object.__getattribute__(obj, "_during_init"):
-                obj._during_init = True
-                obj.initialize()
-                obj._during_init = False
-                obj._initialized = True
-            return object.__getattribute__(obj, attr)
-
-        new_obj = type.__call__(self, *args, **kwargs)
-        new_obj._initialized = False
-        new_obj._during_init = False
-
-        self.__getattribute__ = init_before_get
-
-        return new_obj
+    def __iter__(cls):
+        return iter(cls._registry)
 
 
 @total_ordering
-class Asset(metaclass=LazyInit):
+class Asset(metaclass=IterRegistry):
+    _registry = []
 
     def __init__(self, conid_or_symbol, exchange):
+        self._registry.append(self)
         self._init_conid_or_symbol = conid_or_symbol
         self._init_exchange = exchange
+        self._initialized = False
+        if LISTINGS_FILE:
+            self.initialize()
 
     def initialize(self):
         self._init_conid_or_symbol = str(self._init_conid_or_symbol)
@@ -159,6 +153,8 @@ class Asset(metaclass=LazyInit):
         elif self.selected_exchange in available_calendars_1:
             self.calendar = tc2.get_calendar(self.selected_exchange)
 
+        self._initialized = True
+
     def can_trade(self, date, time=None):
         """Given a date and optional time, returns whether the asset can be traded at that time.
 
@@ -196,6 +192,8 @@ class Asset(metaclass=LazyInit):
         return hash(self.conid)
 
     def __repr__(self):
+        if not self._initialized:
+            return "Asset(uninitialized)"
         calendar_name = self.calendar.name if self.calendar else None
         return "Asset(ConId={}, Symbol={}, Exchange={}, Timezone={}, calendar={})".format(self.conid,
                                                                                           self.symbol,
