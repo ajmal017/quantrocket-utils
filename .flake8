@@ -1,0 +1,12 @@
+[flake8]
+max-line-length = 82
+ignore =
+    # Unused Imports
+    F401,
+    # Star imports
+    F403,
+    F405,
+    # Multiple '#'
+    E266,
+    # Lambdas
+    E731,

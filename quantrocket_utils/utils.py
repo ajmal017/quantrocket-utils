@@ -35,25 +35,29 @@ def timeit(title=None):
     yield
     elapsed = time() - start
     if elapsed < 1:
-        print("{}  finished in {} ms".format(colored("\u2713", "green"), int(elapsed * 1000)))
+        print("{}  finished in {} ms".format(colored("\u2713", "green"),
+                                             int(elapsed * 1000)))
     elif elapsed < 60:
-        print("{}  finished in {:0.2f} sec".format(colored("\u2713", "green"), elapsed))
+        print("{}  finished in {:0.2f} sec".format(colored("\u2713", "green"),
+                                                   elapsed))
     else:
-        print("{}  finished in {:0.2f} min".format(colored("\u2713", "green"), elapsed / 60))
+        print("{}  finished in {:0.2f} min".format(colored("\u2713", "green"),
+                                                   elapsed / 60))
 
 
 def is_quantrocket():
     try:
         from quantrocket.houston import Houston
         return Houston().get("/").status_code == 200
-    except:
+    except:  # noqa: E722
         return False
 
 ###
 
 
 def initialize(listings_file):
-    global LISTINGS_FILE, CACHE_FILE, CONID_SYMBOL_MAP, SYMBOL_CONID_MAP, CONID_TIMEZONE_MAP
+    global LISTINGS_FILE, CACHE_FILE, CONID_SYMBOL_MAP
+    global SYMBOL_CONID_MAP, CONID_TIMEZONE_MAP
     colorama_init()
 
     LISTINGS_FILE = listings_file
@@ -68,10 +72,12 @@ def initialize(listings_file):
             reader = csv.reader(f)
             next(reader)
             for line in reader:
-                conid, symbol, sec_type, primary_exchange, timezone, valid_exchanges = (int(line[0]), line[1], line[3],
-                                                                                        line[4], line[10], line[11].split(","))
-                CONID_SYMBOL_MAP[str(conid)] = (symbol, primary_exchange, valid_exchanges)
-                SYMBOL_CONID_MAP[symbol].append((conid, primary_exchange, valid_exchanges))
+                conid, symbol, primary_exchange = (int(line[0]), line[1], line[4])
+                timezone, valid_exchanges = (line[10], line[11].split(","))
+                CONID_SYMBOL_MAP[str(conid)] = (symbol, primary_exchange,
+                                                valid_exchanges)
+                SYMBOL_CONID_MAP[symbol].append((conid, primary_exchange,
+                                                 valid_exchanges))
                 CONID_TIMEZONE_MAP[conid] = timezone
 
         data = (CONID_SYMBOL_MAP, SYMBOL_CONID_MAP, CONID_TIMEZONE_MAP)
@@ -104,16 +110,17 @@ class Asset(metaclass=IterRegistry):
     def initialize(self):
         self._init_conid_or_symbol = str(self._init_conid_or_symbol)
         if not LISTINGS_FILE:
-            raise Exception("Listings file is not set. Did you forget to call initialize()?")
+            raise Exception("Listings file is not set.\
+                             Did you forget to call initialize()?")
         if self._init_conid_or_symbol in CONID_SYMBOL_MAP:
             # Input is a ConId
             self.conid = int(self._init_conid_or_symbol)
-            self.symbol, self.primary_exchange, self.valid_exchanges = CONID_SYMBOL_MAP[self._init_conid_or_symbol]
+            self.symbol, self.primary_exchange, self.valid_exchanges = CONID_SYMBOL_MAP[self._init_conid_or_symbol]  # noqa:E501
         elif self._init_conid_or_symbol in SYMBOL_CONID_MAP:
             # Input is a Symbol
             if not self._init_exchange:
                 if len(SYMBOL_CONID_MAP[self._init_conid_or_symbol]) == 1:
-                    conid, primary_exchange, valid_exchanges = SYMBOL_CONID_MAP[self._init_conid_or_symbol][0]
+                    conid, primary_exchange, valid_exchanges = SYMBOL_CONID_MAP[self._init_conid_or_symbol][0]  # noqa:E501
                     self.conid = int(conid)
                     self.symbol = self._init_conid_or_symbol
                     self.primary_exchange = primary_exchange
@@ -122,11 +129,12 @@ class Asset(metaclass=IterRegistry):
                     all_exchanges = []
                     for item in SYMBOL_CONID_MAP[self._init_conid_or_symbol]:
                         all_exchanges.extend(item[2])
-                    raise Exception("Multiple symbols found. Please specify an exchange."
-                                    "\nValid exchanges are: {}".format(", ".join(sorted(set(all_exchanges)))))
+                    raise Exception("Multiple symbols found. Please specify an exchange."  # noqa:E501
+                                    "\nValid exchanges are: {}".format(", ".join(sorted(set(all_exchanges)))))  # noqa:E501
             else:
-                for conid, primary_exchange, valid_exchanges in SYMBOL_CONID_MAP[self._init_conid_or_symbol]:
-                    if self._init_exchange == primary_exchange or self._init_exchange in valid_exchanges:
+                for conid, primary_exchange, valid_exchanges in SYMBOL_CONID_MAP[self._init_conid_or_symbol]:  # noqa:E501
+                    if self._init_exchange == primary_exchange or \
+                       self._init_exchange in valid_exchanges:
                         self.conid = int(conid)
                         self.symbol = self._init_conid_or_symbol
                         self.primary_exchange = primary_exchange
@@ -137,15 +145,16 @@ class Asset(metaclass=IterRegistry):
                     for item in SYMBOL_CONID_MAP[self._init_conid_or_symbol]:
                         all_exchanges.extend(item[2])
                     raise Exception("{} is not a valid exchange."
-                                    "\nValid exchanges are: {}".format(self._init_exchange, ", ".join(sorted(set(all_exchanges)))))
+                                    "\nValid exchanges are: {}".format(self._init_exchange, ", ".join(sorted(set(all_exchanges)))))  # noqa:E501
         else:
-            raise Exception("{} is neither a valid symbol nor a valid ConId".format(self._init_conid_or_symbol))
+            raise Exception("{} is neither a valid symbol nor a valid ConId".format(self._init_conid_or_symbol))  # noqa:E501
 
         self.timezone = CONID_TIMEZONE_MAP[self.conid]
         self.selected_exchange = self._init_exchange or self.primary_exchange
 
-        available_calendars_1 = set(tc1.calendar_utils._default_calendar_aliases.keys()) | \
-            set(tc1.calendar_utils._default_calendar_aliases.values())
+        s1 = set(tc1.calendar_utils._default_calendar_aliases.keys())
+        s2 = set(tc1.calendar_utils._default_calendar_aliases.values())
+        available_calendars_1 = s1 | s2
         available_calendars_2 = set(tc2.ib_calendar_names)
         self.calendar = None
         if self.selected_exchange in available_calendars_2:
@@ -156,24 +165,27 @@ class Asset(metaclass=IterRegistry):
         self._initialized = True
 
     def can_trade(self, date, time=None):
-        """Given a date and optional time, returns whether the asset can be traded at that time.
+        """Given a date and optional time, returns whether the asset can be traded.
 
-        This will check dates and times in the timezone of the exchange the asset is traded in.
-        If no calendar could be determined for the asset, the result is always 'True'.
+        This will check dates and times in the timezone
+        of the exchange the asset is traded in.
+        If no calendar could be determined for the asset,
+        the result is always 'True'.
         """
         if not self.calendar:
             return True
         if time:
-            datetime = arrow.get("{} {}".format(date, time), "YYYY-MM-DD HH:mm:ss")
+            datetime = arrow.get("{} {}".format(date, time), "YYYY-MM-DD HH:mm:ss")  # noqa:E501
         else:
             datetime = arrow.get(date, "YYYY-MM-DD")
         datetime = datetime.replace(tzinfo=self.calendar.tz).to("UTC")
         if datetime.date() in self.calendar.schedule.index:
             # Exchange is open
             if time:
-                market_open, market_close = self.calendar.schedule.loc[datetime.date()]
-                if not market_open.time() <= datetime.time() <= market_close.time():
-                    # Current time is not in open range, either too early or too late
+                market_open, market_close = self.calendar.schedule.loc[datetime.date()]  # noqa:E501
+                if not market_open.time() <= datetime.time() <= market_close.time():  # noqa:E501
+                    # Current time is not in open range,
+                    # either too early or too late
                     return False
             else:
                 return True
@@ -195,8 +207,8 @@ class Asset(metaclass=IterRegistry):
         if not self._initialized:
             return "Asset(uninitialized)"
         calendar_name = self.calendar.name if self.calendar else None
-        return "Asset(ConId={}, Symbol={}, Exchange={}, Timezone={}, calendar={})".format(self.conid,
-                                                                                          self.symbol,
-                                                                                          self.selected_exchange,
-                                                                                          self.timezone,
-                                                                                          calendar_name)
+        return "Asset(ConId={}, Symbol={}, Exchange={}, Timezone={}, calendar={})".format(self.conid,  # noqa:E501
+                                                                                          self.symbol,  # noqa:E501
+                                                                                          self.selected_exchange,  # noqa:E501
+                                                                                          self.timezone,  # noqa:E501
+                                                                                          calendar_name)  # noqa:E501
