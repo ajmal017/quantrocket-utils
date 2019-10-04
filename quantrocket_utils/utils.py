@@ -93,7 +93,7 @@ class IterRegistry(type):
 class Asset(metaclass=IterRegistry):
     _registry = []
 
-    def __init__(self, conid_or_symbol, exchange):
+    def __init__(self, conid_or_symbol, exchange=None):
         self._registry.append(self)
         self._init_conid_or_symbol = conid_or_symbol
         self._init_exchange = exchange
