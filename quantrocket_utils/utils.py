@@ -99,11 +99,14 @@ class IterRegistry(type):
 class Asset(metaclass=IterRegistry):
     _registry = []
 
-    def __init__(self, conid_or_symbol, exchange=None):
+    def __init__(self, conid_or_symbol, exchange=None, ignore_exchange=False):
         self._registry.append(self)
         self._init_conid_or_symbol = conid_or_symbol
         self._init_exchange = exchange
         self._initialized = False
+        self.conid = None
+        self.primary_exchange = None
+        self.ignore_exchange = ignore_exchange
         if LISTINGS_FILE:
             self.initialize()
 
@@ -125,12 +128,15 @@ class Asset(metaclass=IterRegistry):
                     self.symbol = self._init_conid_or_symbol
                     self.primary_exchange = primary_exchange
                     self.valid_exchanges = valid_exchanges
-                else:
+                elif not self.ignore_exchange:
                     all_exchanges = []
                     for item in SYMBOL_CONID_MAP[self._init_conid_or_symbol]:
+                        print(item[1])
                         all_exchanges.extend(item[2])
                     raise Exception("Multiple symbols found. Please specify an exchange."  # noqa:E501
                                     "\nValid exchanges are: {}".format(", ".join(sorted(set(all_exchanges)))))  # noqa:E501
+                else:
+                    self.symbol = self._init_conid_or_symbol
             else:
                 for conid, primary_exchange, valid_exchanges in SYMBOL_CONID_MAP[self._init_conid_or_symbol]:  # noqa:E501
                     if self._init_exchange == primary_exchange or \
@@ -152,15 +158,16 @@ class Asset(metaclass=IterRegistry):
         self.timezone = CONID_TIMEZONE_MAP[self.conid]
         self.selected_exchange = self._init_exchange or self.primary_exchange
 
-        s1 = set(tc1.calendar_utils._default_calendar_aliases.keys())
-        s2 = set(tc1.calendar_utils._default_calendar_aliases.values())
-        available_calendars_1 = s1 | s2
-        available_calendars_2 = set(tc2.ib_calendar_names)
-        self.calendar = None
-        if self.selected_exchange in available_calendars_2:
-            self.calendar = tc1.get_calendar(self.selected_exchange)
-        elif self.selected_exchange in available_calendars_1:
-            self.calendar = tc2.get_calendar(self.selected_exchange)
+        if not self.ignore_exchange:
+            s1 = set(tc1.calendar_utils._default_calendar_aliases.keys())
+            s2 = set(tc1.calendar_utils._default_calendar_aliases.values())
+            available_calendars_1 = s1 | s2
+            available_calendars_2 = set(tc2.ib_calendar_names)
+            self.calendar = None
+            if self.selected_exchange in available_calendars_2:
+                self.calendar = tc1.get_calendar(self.selected_exchange)
+            elif self.selected_exchange in available_calendars_1:
+                self.calendar = tc2.get_calendar(self.selected_exchange)
 
         self._initialized = True
 
@@ -206,9 +213,12 @@ class Asset(metaclass=IterRegistry):
     def __repr__(self):
         if not self._initialized:
             return "Asset(uninitialized)"
-        calendar_name = self.calendar.name if self.calendar else None
-        return "Asset(ConId={}, Symbol={}, Exchange={}, Timezone={}, calendar={})".format(self.conid,  # noqa:E501
-                                                                                          self.symbol,  # noqa:E501
-                                                                                          self.selected_exchange,  # noqa:E501
-                                                                                          self.timezone,  # noqa:E501
-                                                                                          calendar_name)  # noqa:E501
+        if self.ignore_exchange:
+            return "Asset(Symbol={})".format(self.symbol)
+        else:
+            calendar_name = self.calendar.name if self.calendar else None
+            return "Asset(ConId={}, Symbol={}, Exchange={}, Timezone={}, calendar={})".format(self.conid,  # noqa:E501
+                                                                                              self.symbol,  # noqa:E501
+                                                                                              self.selected_exchange,  # noqa:E501
+                                                                                              self.timezone,  # noqa:E501
+                                                                                              calendar_name)  # noqa:E501

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "quantrocket-utils"
-version = "0.1.5"
+version = "0.1.6"
 description = "Utility methods for common tasks in QuantRocket."
 authors = ["Tim Wedde <timwedde@icloud.com>"]
 license = "MIT"
