@@ -201,17 +201,17 @@ class Asset(metaclass=IterRegistry):
             return False
 
     def __eq__(self, other):
-        if self.ignore_exchange:
+        if self.ignore_exchange or other.ignore_exchange:
             return self.symbol == other.symbol
         return self.conid == other.conid
 
     def __lt__(self, other):
-        if self.ignore_exchange:
+        if self.ignore_exchange or other.ignore_exchange:
             return self.symbol < other.symbol
         return self.conid < other.conid
 
     def __hash__(self):
-        if self.ignore_exchange:
+        if self.ignore_exchange or other.ignore_exchange:
             return hash(self.symbol)
         return hash(self.conid)
 
