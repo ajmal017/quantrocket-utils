@@ -131,7 +131,6 @@ class Asset(metaclass=IterRegistry):
                 elif not self.ignore_exchange:
                     all_exchanges = []
                     for item in SYMBOL_CONID_MAP[self._init_conid_or_symbol]:
-                        print(item[1])
                         all_exchanges.extend(item[2])
                     raise Exception("Multiple symbols found. Please specify an exchange."  # noqa:E501
                                     "\nValid exchanges are: {}".format(", ".join(sorted(set(all_exchanges)))))  # noqa:E501
@@ -202,12 +201,18 @@ class Asset(metaclass=IterRegistry):
             return False
 
     def __eq__(self, other):
+        if self.ignore_exchange:
+            return self.symbol == other.symbol
         return self.conid == other.conid
 
     def __lt__(self, other):
+        if self.ignore_exchange:
+            return self.symbol < other.symbol
         return self.conid < other.conid
 
     def __hash__(self):
+        if self.ignore_exchange:
+            return hash(self.symbol)
         return hash(self.conid)
 
     def __repr__(self):
