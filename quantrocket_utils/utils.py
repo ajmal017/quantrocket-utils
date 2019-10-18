@@ -211,7 +211,7 @@ class Asset(metaclass=IterRegistry):
         return self.conid < other.conid
 
     def __hash__(self):
-        if self.ignore_exchange or other.ignore_exchange:
+        if self.ignore_exchange:
             return hash(self.symbol)
         return hash(self.conid)
 
