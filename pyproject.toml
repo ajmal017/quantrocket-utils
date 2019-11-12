@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "quantrocket-utils"
-version = "0.1.9"
+version = "0.2.0"
 description = "Utility methods for common tasks in QuantRocket."
 authors = ["Tim Wedde <timwedde@icloud.com>"]
 license = "MIT"
@@ -9,7 +9,7 @@ repository = "https://github.com/boosting-alpha-bv/quantrocket-utils"
 homepage = "https://github.com/boosting-alpha-bv/quantrocket-utils"
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.6"
 arrow = "^0.15.2"
 colorama = "^0.4.1"
 trading-calendars = "^1.11"
